@@ -1,3 +1,4 @@
+# AquaFusion - BSIT 4A - CPSTONE
 import time
 import pyrebase
 import busio
@@ -18,7 +19,7 @@ firebase_admin.initialize_app(cred, {
 # Initialize Firebase Admin for Firestore
 cred_firestore = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
 firebase_admin.initialize_app(cred_firestore, {
-    'projectId': FIREBASE_CONFIG['projectId'],  # Add your Firebase project ID
+    'projectId': FIREBASE_CONFIG['projectId'],
 }, name='firestore')
 
 # Initialize Realtime Database
