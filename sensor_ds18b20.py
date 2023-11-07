@@ -33,7 +33,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS.ADS1115(i2c)
 
 # Create an analog input channel on the ADS1115 (A0 in this example)
-chan = AnalogIn(ads, ADS.P0)
+chan = AnalogIn(ads, ADS.P2)
 
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()

@@ -38,7 +38,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS.ADS1115(i2c)
 
 # Create an analog input channel on the ADS1115 (A0 in this example)
-chan = AnalogIn(ads, ADS.P0)
+chan = AnalogIn(ads, ADS.P1)
 
 print("Data sent to Firebase successfully")
 
