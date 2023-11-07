@@ -23,8 +23,11 @@ Elijah Nicholas Esguerra - Web Application
 Janine Christine Valllente - Mobile Application
 Junester Ursora II - IoT Integration
 
-## Adviser
+## Adviser - General Integgration
 Mr. Eric Ortega
+
+## Adviser - Hardware Integration
+Mr. David Matthew Derit
 
 ---
 
