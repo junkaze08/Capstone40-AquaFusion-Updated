@@ -1,12 +1,18 @@
-# Project README
+# AquaFusion README
 
-**School**: University of Cebu - Banilad
-**Subject**: CAPSTONE40 - 75443
-**Programmer**: Junester Ursora II
-**Course/Year/Section**: BSIT 4-A
-**Language**: Python
-**OS**: Ubuntu Server 22.04.3 LTS aarch64
-**Host**: Raspberry Pi 4 Model B Rev 1
+**School**: *University of Cebu - Banilad*
+
+**Subject**: *CAPSTONE40 - 75443*
+
+**Programmer**: *Junester Ursora II*
+
+**Course/Year/Section**: *BSIT 4-A*
+
+**Language**: *Python*
+
+**OS**: *Ubuntu Server 22.04.3 LTS aarch64*
+
+**Host**: *Raspberry Pi 4 Model B Rev 1*
 
 ## Overview
 
@@ -19,9 +25,11 @@ This project is part of the CAPSTONE40 subject (75443) at the University of Cebu
 **This is an updated version of the code. This project utilizes Firebase Admin SDK**
 
 ## Group Members 
-Elijah Nicholas Esguerra - Web Application
-Janine Christine Valllente - Mobile Application
-Junester Ursora II - IoT Integration
+Elijah Nicholas Esguerra - *Web Application*
+
+Janine Christine Valllente - *Mobile Application*
+
+Junester Ursora II - *IoT Integration*
 
 ## Adviser - General Integration
 Mr. Eric Ortega
