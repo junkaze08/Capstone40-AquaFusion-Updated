@@ -52,7 +52,7 @@ def read_temp():
         return temp_c
 
 while True:
-    temperature = read_temp()
+    temperature = round(read_temp(), 1)
 
     # Get the current time
     current_time = time.time()
@@ -60,7 +60,7 @@ while True:
     if temperature is not None:
         print(f"Temperature: {temperature}°C")
 
-        if (current_time - last_realtime_upload_time) >= 5:  # Upload to Realtime Database every 5 seconds
+        if (current_time - last_realtime_upload_time) >= 1:  # Upload to Realtime Database every 5 seconds
             data_realtime_db = {"temperature": temperature}
             realtime_db.set(data_realtime_db)
             last_realtime_upload_time = current_time

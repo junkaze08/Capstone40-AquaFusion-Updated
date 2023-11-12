@@ -7,7 +7,7 @@ from firebase_admin import db, firestore
 from config import FIREBASE_CONFIG
 
 DHT_SENSOR = Adafruit_DHT.DHT22
-DHT_PIN = 17
+DHT_PIN = 26
 
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
 firebase_admin.initialize_app(cred, {
@@ -29,7 +29,10 @@ while True:
     try:
         humidity, temperature = Adafruit_DHT.read(DHT_SENSOR, DHT_PIN)
         if humidity is not None and temperature is not None:
-            print("Temp={0:0.1f}C  Humidity={1:0.1f}%".format(temperature, humidity))
+            temperature = round(temperature, 1)
+            humidity = round(humidity, 1)
+            
+            print("Temperature: {:.1f}C, Humidity: {:.1f}%".format(temperature, humidity))
 
             if temperature < 35:
                 message = "Ambient Temperature"
