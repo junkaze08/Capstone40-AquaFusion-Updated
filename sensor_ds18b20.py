@@ -1,10 +1,8 @@
-# AquaFusion - BSIT 4A - CPSTONE
+import glob
 import time
 import pyrebase
 import board
 import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
@@ -28,35 +26,34 @@ realtime_db = db.reference('/Temperature', app=firebase_admin.get_app(name='real
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
-# Initialize the I2C bus and ADS1115 ADC
-i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS.ADS1115(i2c)
-
-# Create an analog input channel on the ADS1115 (A0 in this example)
-chan = AnalogIn(ads, ADS.P2)
-
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()
 last_realtime_upload_time = time.time()
 
-def read_analog_temperature():
-    try:
-        # Read analog voltage from the ADS1115
-        analog_value = chan.value
-        voltage = analog_value * 0.0001875  # 3.3V reference voltage
+base_dir = '/sys/bus/w1/devices/'
+device_folder = glob.glob(base_dir + '28*')[0]
+device_file = device_folder + '/w1_slave'
 
-        # Convert the voltage to temperature
-        # Modify this part based on your specific temperature sensor
-        temperature = voltage  # Modify this line for your temperature conversion
+def read_temp_raw():
+    f = open(device_file, 'r')
+    lines = f.readlines()
+    f.close()
+    return lines
 
-        return temperature
-    except Exception as e:
-        print(f"Error reading analog temperature: {e}")
-        return None
+def read_temp():
+    lines = read_temp_raw()
+    while lines[0].strip()[-3:] != 'YES':
+        time.sleep(0.2)
+        lines = read_temp_raw()
+    equals_pos = lines[1].find('t=')
+    if equals_pos != -1:
+        temp_string = lines[1][equals_pos + 2:]
+        temp_c = float(temp_string) / 1000.0
+        return temp_c
 
 while True:
-    temperature = read_analog_temperature()
-    
+    temperature = read_temp()
+
     # Get the current time
     current_time = time.time()
 
@@ -67,7 +64,7 @@ while True:
             data_realtime_db = {"temperature": temperature}
             realtime_db.set(data_realtime_db)
             last_realtime_upload_time = current_time
-        
+
         if (current_time - last_firestore_upload_time) >= 60:  # Upload to Firestore every 60 seconds
             data_firestore = {"temperature": temperature}
             doc_ref = db.collection('Temperature').add(data_firestore)
@@ -76,4 +73,4 @@ while True:
     else:
         print("Error reading temperature data")
 
-    time.sleep(5)  # Sleep for 1 second to control the loop rate
+    time.sleep(1)
