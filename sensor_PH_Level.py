@@ -44,7 +44,16 @@ last_firestore_upload_time = time.time()
 
 # Function to convert raw ADC value to pH
 def convert_to_ph(raw_value):
-    return m * raw_value + b
+    # Divide raw value by 1000 to get a decimal value
+    voltage = raw_value / 1000  
+
+    # Apply calibration equation
+    pH = m * voltage + b
+    
+    # Round to 1 decimal place
+    pH = '{0:.1f}'.format(pH)
+
+    return pH
 
 # Read the pH level and send data to both Realtime Database and Firestore
 while True:
@@ -55,7 +64,7 @@ while True:
     pH = convert_to_ph(raw_value)
 
     # Print the pH level
-    print(f'pH Level: {pH:.2f}')
+    print(f'pH Level: {pH}')
     
     # Get the current time
     current_time = time.time()
