@@ -12,7 +12,7 @@
 
 **OS**: *Ubuntu Server 22.04.3 LTS aarch64*
 
-**Host**: *Raspberry Pi 4 Model B Rev 1*
+**Host**: *Raspberry Pi 4 Model B Rev 1.5*
 
 ## Overview
 
@@ -32,7 +32,10 @@ Janine Christine Valllente - *Mobile Application*
 Junester Ursora II - *IoT Integration*
 
 ## Adviser - General Integration
-Mr. Eric Ortega
+Mr. Eric P. Ortega
+
+## Adviser - Capstone Teacher
+Mr. Jecris G. Sabanal
 
 ## Adviser - Hardware Integration
 Mr. David Matthew Derit
