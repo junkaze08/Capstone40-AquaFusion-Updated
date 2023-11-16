@@ -1,6 +1,4 @@
-# AquaFusion - BSIT 4A - CPSTONE
 import time
-import pyrebase
 import board
 import busio
 import adafruit_ads1x15.ads1115 as ADS
@@ -9,11 +7,6 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
 from config import FIREBASE_CONFIG
-
-# Define the Lettuce ranges
-lettuce_cf_range = (8, 12)  # Conductivity Factor (cF)
-lettuce_ec_range = (0.8, 1.2)  # Electro-Conductivity (EC) in mS
-lettuce_ppm_range = (560, 840)  # PPM
 
 # Initialize Firebase Admin for Realtime Database
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
@@ -33,72 +26,100 @@ realtime_db = db.reference('/TDS_values', app=firebase_admin.get_app(name='realt
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
-# Initialize the I2C bus and ADS1115 ADC
-i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS.ADS1115(i2c)
-
-# Create an analog input channel on the ADS1115 (A0 in this example)
-chan = AnalogIn(ads, ADS.P1)
-
-print("Data sent to Firebase successfully")
-
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()
 
+TdsSensorPin = 0  # A0 on ADS1115
+VREF = 5.0  # Analog reference voltage (Volt) of the ADC
+SCOUNT = 30  # Sum of sample points
+
+analogBuffer = [0] * SCOUNT
+analogBufferIndex = 0
+
+# Create the I2C bus
+i2c = busio.I2C(board.SCL, board.SDA)
+
+def create_ads_object():
+    return ADS.ADS1115(i2c)
+
+# Create the initial ADC object
+ads = create_ads_object()
+
+# Create single-ended input on channel 0
+chan = AnalogIn(ads, ADS.P0)
+
+def get_median_value(bArray):
+    bTab = sorted(bArray)
+    iFilterLen = len(bArray)
+
+    if iFilterLen % 2 == 1:
+        bTemp = bTab[(iFilterLen - 1) // 2]
+    else:
+        bTemp = (bTab[iFilterLen // 2] + bTab[iFilterLen // 2 - 1]) / 2
+
+    return bTemp
+
+def calculate_tds(voltage):
+    temperature = 25.0
+    compensation_coefficient = 1.0 + 0.02 * (temperature - 25.0)
+    compensation_voltage = voltage / compensation_coefficient
+    tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5 - 6.0
+
+    # Ensure the result is not less than 0
+    tds_value = max(tds_value, 0)
+
+    return tds_value
+
 while True:
-    try:
-        # Read TDS data from the analog sensor connected to the ADS1115
-        tds_raw = chan.value  # Read the analog value directly
-        print("TDS Raw Value:", tds_raw)
+    # Read analog value from ADS1115
+    analogBuffer[analogBufferIndex] = chan.value
+    analogBufferIndex += 1
 
-        # Convert TDS to EC, cF, and PPM using the provided conversion factors
-        cf_value = tds_raw / 640.0
-        ec_value = cf_value / 10.0
-        ppm_value = ec_value * 700.0
+    if analogBufferIndex == SCOUNT:
+        analogBufferIndex = 0
 
-        def check_ranges(value, value_range):
-            # Check if a value is within the specified range
-            return value_range[0] <= value <= value_range[1]
+    # Check if TDS value is 0.00 and reset the ADC
+    if get_median_value(analogBuffer) == 0.00:
+        ads = create_ads_object()  # Create a new ADC object
+        time.sleep(0.1)  # Wait for ADC to reset
+        continue  # Skip the rest of the loop iteration
 
-        in_cf_range = check_ranges(cf_value, lettuce_cf_range)
-        in_ec_range = check_ranges(ec_value, lettuce_ec_range)
-        in_ppm_range = check_ranges(ppm_value, lettuce_ppm_range)
+    # Wait for a short time to avoid rapid readings
+    time.sleep(0.2)
 
-        print("Electro-Conductivity (EC) in mS: {:.1f}".format(ec_value))
-        print("Conductivity Factor (cF): {:.1f}".format(cf_value))
-        print("Parts per million (PPM): {:.1f}".format(ppm_value))
+    # Calculate TDS value
+    average_value = get_median_value(analogBuffer)
+    scaled_value = average_value * (VREF / 32767.0)
+    ppmRound = calculate_tds (scaled_value)
+    ppm = round(ppmRound, 2)
+    
 
-        # Dictionary with the data to send to Firebase Realtime Database
-        data_realtime_db = {
-            "tds_raw": tds_raw,
-            "ec_mS": ec_value,
-            "cF": cf_value,
-            "ppm": ppm_value,
+    # Print TDS value (adjusted by subtracting 2, limited to not be less than 0)
+    print("TDS Value: {:.2f} ppm".format(ppm))
+
+    # Dictionary with the data to send to Firebase Realtime Database
+    data_realtime_db = {
+        "ppm": ppm,
+        # Add more data as needed
+    }
+
+    # Send the data to Firebase Realtime Database
+    realtime_db.set(data_realtime_db)
+
+    # Get the current time
+    current_time = time.time()
+
+    # Check if an hour has passed since the last Firestore upload
+    if (current_time - last_firestore_upload_time) >= 60:  # 60 seconds = 1 minute
+        last_firestore_upload_time = current_time
+
+        # Dictionary with the data to send to Firestore
+        data_firestore = {
+            "ppm": ppm,
             # Add more data as needed
         }
 
-        # Send the data to Firebase Realtime Database
-        realtime_db.set(data_realtime_db)
+        doc_ref = db.collection('TDS_values').add(data_firestore)
 
-        # Get the current time
-        current_time = time.time()
-
-        # Check if an hour has passed since the last Firestore upload
-        if (current_time - last_firestore_upload_time) >= 3600:  # 3600 seconds = 1 hour
-            last_firestore_upload_time = current_time
-
-            # Dictionary with the data to send to Firestore
-            data_firestore = {
-                "tds_raw": tds_raw,
-                "ec_mS": ec_value,
-                "cF": cf_value,
-                "ppm": ppm_value,
-                # Add more data as needed
-            }
-
-            doc_ref = db.collection('TDS_values').add(data_firestore)
-
-        time.sleep(3)
-
-    except KeyboardInterrupt:
-        break
+    # Wait for the next iteration
+    time.sleep(2)
