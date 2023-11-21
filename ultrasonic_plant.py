@@ -22,7 +22,7 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/Ultrasonic_Plant', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference('/ultrasonic_plant', app=firebase_admin.get_app(name='realtime'))
 
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
@@ -73,7 +73,7 @@ try:
                     "distance": distance              
                 }
                 
-                doc_ref = db.collection('Ultrasonic_Plant').add(data_firestore)
+                doc_ref = db.collection('ultrasonic_plant').add(data_firestore)
         except KeyboardInterrupt:
             print("Measurement stopped by the user.")
             break

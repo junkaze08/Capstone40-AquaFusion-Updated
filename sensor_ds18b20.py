@@ -21,7 +21,7 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/Temperature', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference('/DS18B20_water_temperature', app=firebase_admin.get_app(name='realtime'))
 
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
@@ -67,7 +67,7 @@ while True:
 
         if (current_time - last_firestore_upload_time) >= 60:  # Upload to Firestore every 60 seconds
             data_firestore = {"temperature": temperature}
-            doc_ref = db.collection('Temperature').add(data_firestore)
+            doc_ref = db.collection('DS18B20_water_temperature').add(data_firestore)
             last_firestore_upload_time = current_time
 
     else:

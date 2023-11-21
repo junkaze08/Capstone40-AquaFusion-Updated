@@ -21,7 +21,7 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/TDS_values', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference('/tds_values', app=firebase_admin.get_app(name='realtime'))
 
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
@@ -119,7 +119,7 @@ while True:
             # Add more data as needed
         }
 
-        doc_ref = db.collection('TDS_values').add(data_firestore)
+        doc_ref = db.collection('tds_values').add(data_firestore)
 
     # Wait for the next iteration
     time.sleep(2)
