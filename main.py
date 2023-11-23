@@ -29,6 +29,10 @@ time.sleep(y)
 
 process2 = subprocess.Popen([python3_path, 'sensor_PH_Level.py'])
 
+time.sleep(y)
+
+process2 = subprocess.Popen([python3_path, 'sensor_checker.py'])
+
 try:
     while True:
         time.sleep(1)
