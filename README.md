@@ -1,5 +1,7 @@
 # AquaFusion README
 
+**Capstone Title**: *AquaFusion: An IoT-Based Aquaponics Monitoring System*
+
 **School**: *University of Cebu - Banilad*
 
 **Subject**: *CAPSTONE40 - 75443*
@@ -20,7 +22,7 @@ This README file provides essential information about the project. Please refer 
 
 ## Project Description
 
-This project is part of the CAPSTONE40 subject (75443) at the University of Cebu - Banilad, completed by Junester Ursora II, a student of BSIT 4-A. The project is written in Python and executed on an Ubuntu Server 22.04.3 LTS aarch64 environment hosted on a Raspberry Pi 4 Model B Rev 1. 
+This project is part of the CAPSTONE40 subject (75443) at the University of Cebu - Banilad, completed by Junester Ursora II, a student of BSIT 4-A. The project is written in Python and executed on an Ubuntu Server 22.04.3 LTS aarch64 environment hosted on a Raspberry Pi 4 Model B Rev 1.5. 
 
 **This is an updated version of the code. This project utilizes Firebase Admin SDK**
 
