@@ -62,7 +62,7 @@ while True:
 
         if (current_time - last_realtime_upload_time) >= 1:  # Upload to Realtime Database every 5 seconds
             data_realtime_db = {"temperature": temperature}
-            realtime_db.set(data_realtime_db)
+            realtime_db.update(data_realtime_db)
             last_realtime_upload_time = current_time
 
         if (current_time - last_firestore_upload_time) >= 60:  # Upload to Firestore every 60 seconds

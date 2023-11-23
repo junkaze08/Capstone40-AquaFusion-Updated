@@ -73,7 +73,7 @@ while True:
     data_realtime_db = {
         "ph_level": pH
     }
-    realtime_db.set(data_realtime_db)
+    realtime_db.update(data_realtime_db)
 
     # Send data to Firestore every 60 seconds
     if (current_time - last_firestore_upload_time) >= 60:  # 60 seconds

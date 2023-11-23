@@ -75,8 +75,8 @@ while True:
             }
 
             # Send data to Realtime Database
-            realtime_db_humidity.set(data_realtime_db_humidity)
-            realtime_db_temperature.set(data_realtime_db_temperature)
+            realtime_db_humidity.update(data_realtime_db_humidity)
+            realtime_db_temperature.update(data_realtime_db_temperature)
 
             # Get the current time
             current_time = time.time()

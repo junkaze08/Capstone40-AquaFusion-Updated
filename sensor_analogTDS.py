@@ -104,7 +104,7 @@ while True:
     }
 
     # Send the data to Firebase Realtime Database
-    realtime_db.set(data_realtime_db)
+    realtime_db.update(data_realtime_db)
 
     # Get the current time
     current_time = time.time()
