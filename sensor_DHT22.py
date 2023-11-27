@@ -4,7 +4,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG
+from config import FIREBASE_CONFIG, WORKGROUP_ID
 
 DHT_SENSOR = Adafruit_DHT.DHT22
 DHT_PIN = 26
@@ -25,6 +25,8 @@ realtime_db_temperature = db.reference('/dht22_temperature_temperature', app=fir
 
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
+unique_Id = WORKGROUP_ID['uniqueId']
+
 # Reference to the Firestore collection for humidity
 humidity_collection = db.collection('DHT22_Humidity')
 
@@ -33,6 +35,10 @@ temperature_collection = db.collection('DHT22_Temperature')
 
 # Time tracking variables
 last_firestore_upload_time = 0
+
+utc_offset = 8
+curr_time = time.gmtime(time.time() + utc_offset * 3600)
+form_time = time.strftime("%H:%M:%S", curr_time)
 
 while True:
     try:
@@ -43,35 +49,46 @@ while True:
 
             print("Temperature: {:.1f}C, Humidity: {:.1f}%".format(temperature, humidity))
 
-            if temperature < 35:
-                temperature_status = "Ambient Temperature"
-            elif temperature <= 40:
-                temperature_status = "Warning Exceeding Ambient Temperature"
-            elif temperature <= 50:
-                temperature_status = "Exceeding Maximum Temperature"
+            if temperature < 18:
+                temperature_status = "Warning: Cold Temperature"
+            elif 18 <= temperature <= 24:
+                temperature_status = "Optimal Temperature"
             else:
-                temperature_status = "Temperature within a safe range"
+                temperature_status = "Warning: Hot Temperature"
+                
+            if humidity < 60:
+                humidity_status = "Warning: Too Low Humidity"
+            elif 60 <= humidity <= 70:
+                humidity_status = "Optimal Humidity"
+            else:
+                humidity_status = "Warning: Too High Humidity"
 
             print(temperature_status)
+            print(humidity_status)
+            print(form_time)
 
             # Single dictionary for Realtime Database
             data_realtime_db_humidity = {
-                "humidity": humidity
+                "humidity": humidity,
+                "status_notif_dht_humid": humidity_status
             }
             
             data_realtime_db_temperature = {
                 "temperature": temperature,
-                "status": temperature_status
+                "status_notif_dht_temp": temperature_status
             }
 
             # Separate dictionaries for Firestore
             data_firestore_temperature = {
                 "temperature": temperature,
-                "status": temperature_status
+                "timestamp": form_time,
+                "workgroupId": unique_Id
             }
 
             data_firestore_humidity = {
-                "humidity": humidity
+                "humidity": humidity,
+                "timestamp": form_time,
+                "workgroupId": unique_Id
             }
 
             # Send data to Realtime Database

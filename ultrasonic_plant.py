@@ -4,7 +4,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG
+from config import FIREBASE_CONFIG, WORKGROUP_ID
 
 TRIG = 27
 ECHO = 22
@@ -24,10 +24,16 @@ firebase_admin.initialize_app(cred_firestore, {
 # Initialize Realtime Database
 realtime_db = db.reference('/ultrasonic_plant', app=firebase_admin.get_app(name='realtime'))
 
+unique_Id = WORKGROUP_ID['uniqueId']
+
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
 last_firestore_upload_time = time.time()
+
+utc_offset = 8
+curr_time = time.gmtime(time.time() + utc_offset * 3600)
+form_time = time.strftime("%H:%M:%S", curr_time)
 
 try:
     GPIO.setmode(GPIO.BCM)
@@ -53,11 +59,27 @@ try:
             distance = pulse_duration * 17150
             distance = round(distance, 2)
 
+            plant_distance = 20  # initial distance
+            max_growth = 50
+
+            # Conditional statements based on distance
+            if distance <= 0:
+                plant_status = "Error: Distance is not valid."
+            elif distance < max_growth:
+                plant_status = "The plant is growing."
+            elif distance == max_growth:
+                plant_status = "The plant has reached maximum growth."
+            else:
+                plant_status = f"Warning: Unexpected distance value of {distance}. Check sensor or system."
+            
             print("Distance:", distance, "cm")
+            print(form_time)
+            print(plant_status)
 
             # Dictionary with the data to send to Firebase Realtime Database
             data_realtime_db = {
-                "distance": distance            
+                "distance": distance,          
+                "status_notif": plant_status
             }
 
             # Send the data to Firebase Realtime Database
@@ -66,11 +88,13 @@ try:
             # Get the current time
             current_time = time.time()
             
-            if (current_time - last_firestore_upload_time) >= 60:  #60 seconds = 1 minute
+            if (current_time - last_firestore_upload_time) >= 5:  #60 seconds = 1 minute
                 last_firestore_upload_time = current_time
 
                 data_firestore = {
-                    "distance": distance              
+                    "distance": distance,
+                    "timestamp": form_time,       
+                    "workgroupId": unique_Id       
                 }
                 
                 doc_ref = db.collection('ultrasonic_plant').add(data_firestore)

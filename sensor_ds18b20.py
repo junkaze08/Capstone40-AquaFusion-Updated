@@ -6,7 +6,7 @@ import busio
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG
+from config import FIREBASE_CONFIG, WORKGROUP_ID
 
 # Initialize Firebase Admin for Realtime Database
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
@@ -26,6 +26,8 @@ realtime_db = db.reference('/DS18B20_water_temperature', app=firebase_admin.get_
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
+unique_Id = WORKGROUP_ID['uniqueId']
+
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()
 last_realtime_upload_time = time.time()
@@ -33,6 +35,11 @@ last_realtime_upload_time = time.time()
 base_dir = '/sys/bus/w1/devices/'
 device_folder = glob.glob(base_dir + '28*')[0]
 device_file = device_folder + '/w1_slave'
+
+utc_offset = 8
+
+curr_time = time.gmtime(time.time() + utc_offset * 3600)
+form_time = time.strftime("%H:%M:%S", curr_time)
 
 def read_temp_raw():
     f = open(device_file, 'r')
@@ -56,17 +63,35 @@ while True:
 
     # Get the current time
     current_time = time.time()
-
+    
     if temperature is not None:
         print(f"Temperature: {temperature}°C")
+        print(form_time)
 
+        if temperature < 18:
+            temperature_status = "Warning: Cold Temperature"
+        elif 18 <= temperature <= 26:
+            temperature_status = "Optimal Temperature"
+        else:
+            temperature_status = "Warning: Hot Temperature"
+        
         if (current_time - last_realtime_upload_time) >= 1:  # Upload to Realtime Database every 5 seconds
-            data_realtime_db = {"temperature": temperature}
+            
+            data_realtime_db = {
+                "temperature": temperature,
+                "status_notif": temperature_status
+            }
+            
             realtime_db.update(data_realtime_db)
             last_realtime_upload_time = current_time
 
-        if (current_time - last_firestore_upload_time) >= 60:  # Upload to Firestore every 60 seconds
-            data_firestore = {"temperature": temperature}
+        if (current_time - last_firestore_upload_time) >= 5:  # Upload to Firestore every 60 seconds
+            data_firestore = {
+                "temperature": temperature,
+                "timestamp": form_time,
+                "workgroupId": unique_Id
+            }
+            
             doc_ref = db.collection('DS18B20_water_temperature').add(data_firestore)
             last_firestore_upload_time = current_time
 

@@ -6,7 +6,7 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG
+from config import FIREBASE_CONFIG, WORKGROUP_ID
 
 # Initialize Firebase Admin for Realtime Database
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
@@ -28,6 +28,12 @@ db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()
+
+utc_offset = 8
+curr_time = time.gmtime(time.time() + utc_offset * 3600)
+form_time = time.strftime("%H:%M:%S", curr_time)
+
+unique_Id = WORKGROUP_ID['uniqueId']
 
 TdsSensorPin = 0  # A0 on ADS1115
 VREF = 5.0  # Analog reference voltage (Volt) of the ADC
@@ -93,13 +99,22 @@ while True:
     ppmRound = calculate_tds (scaled_value)
     ppm = round(ppmRound, 2)
     
-
+    if(ppm < 560):
+        status_notif = "Warning: TDS level is low!" 
+    elif(ppm <= 860):
+        status_notif = "TDS level is optimal!"
+    else:
+        status_notif = "Warning: TDS level is too high!"
+    
     # Print TDS value (adjusted by subtracting 2, limited to not be less than 0)
     print("TDS Value: {:.2f} ppm".format(ppm))
+    print(status_notif)
+    print(form_time)    
 
     # Dictionary with the data to send to Firebase Realtime Database
     data_realtime_db = {
         "ppm": ppm,
+        "status_notif": status_notif
         # Add more data as needed
     }
 
@@ -110,12 +125,14 @@ while True:
     current_time = time.time()
 
     # Check if an hour has passed since the last Firestore upload
-    if (current_time - last_firestore_upload_time) >= 60:  # 60 seconds = 1 minute
+    if (current_time - last_firestore_upload_time) >= 5:  # 60 seconds = 1 minute
         last_firestore_upload_time = current_time
 
         # Dictionary with the data to send to Firestore
         data_firestore = {
             "ppm": ppm,
+            "timestamp": form_time,
+            "workgroupId": unique_Id
             # Add more data as needed
         }
 
