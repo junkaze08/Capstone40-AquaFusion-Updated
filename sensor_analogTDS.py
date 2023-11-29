@@ -29,10 +29,6 @@ db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 # Create a variable to track the last time data was sent to Firestore
 last_firestore_upload_time = time.time()
 
-utc_offset = 8
-curr_time = time.gmtime(time.time() + utc_offset * 3600)
-form_time = time.strftime("%H:%M:%S", curr_time)
-
 unique_Id = WORKGROUP_ID['uniqueId']
 
 TdsSensorPin = 0  # A0 on ADS1115
@@ -76,67 +72,83 @@ def calculate_tds(voltage):
 
     return tds_value
 
-while True:
-    # Read analog value from ADS1115
-    analogBuffer[analogBufferIndex] = chan.value
-    analogBufferIndex += 1
+try:
+    while True:
+        utc_offset = 8
+        curr_time = time.gmtime(time.time() + utc_offset * 3600)
+        form_time = time.strftime("%H:%M:%S", curr_time)
+        # Read analog value from ADS1115
+        analogBuffer[analogBufferIndex] = chan.value
+        analogBufferIndex += 1
 
-    if analogBufferIndex == SCOUNT:
-        analogBufferIndex = 0
+        if analogBufferIndex == SCOUNT:
+            analogBufferIndex = 0
 
-    # Check if TDS value is 0.00 and reset the ADC
-    if get_median_value(analogBuffer) == 0.00:
-        ads = create_ads_object()  # Create a new ADC object
-        time.sleep(0.1)  # Wait for ADC to reset
-        continue  # Skip the rest of the loop iteration
+        # Check if TDS value is 0.00 and reset the ADC
+        if get_median_value(analogBuffer) == 0.00:
+            ads = create_ads_object()  # Create a new ADC object
+            time.sleep(0.1)  # Wait for ADC to reset
+            continue  # Skip the rest of the loop iteration
 
-    # Wait for a short time to avoid rapid readings
-    time.sleep(0.2)
+        # Wait for a short time to avoid rapid readings
+        time.sleep(0.2)
 
-    # Calculate TDS value
-    average_value = get_median_value(analogBuffer)
-    scaled_value = average_value * (VREF / 32767.0)
-    ppmRound = calculate_tds (scaled_value)
-    ppm = round(ppmRound, 2)
-    
-    if(ppm < 560):
-        status_notif = "Warning: TDS level is low!" 
-    elif(ppm <= 860):
-        status_notif = "TDS level is optimal!"
-    else:
-        status_notif = "Warning: TDS level is too high!"
-    
-    # Print TDS value (adjusted by subtracting 2, limited to not be less than 0)
-    print("TDS Value: {:.2f} ppm".format(ppm))
-    print(status_notif)
-    print(form_time)    
+        # Calculate TDS value
+        average_value = get_median_value(analogBuffer)
+        scaled_value = average_value * (VREF / 32767.0)
+        ppmRound = calculate_tds (scaled_value)
+        ppm = round(ppmRound, 2)
+        
+        if ppm >= 0:
+            checkStatus = True
+        
+        if(ppm < 560):
+            status_notif = "Warning: TDS level is low!" 
+        elif(ppm <= 860):
+            status_notif = "TDS level is optimal!"
+        else:
+            status_notif = "Warning: TDS level is too high!"
+        
+        # Print TDS value (adjusted by subtracting 2, limited to not be less than 0)
+        print("TDS Value: {:.2f} ppm".format(ppm))
+        print(status_notif)
+        print(form_time)    
 
-    # Dictionary with the data to send to Firebase Realtime Database
-    data_realtime_db = {
-        "ppm": ppm,
-        "status_notif": status_notif
-        # Add more data as needed
-    }
-
-    # Send the data to Firebase Realtime Database
-    realtime_db.update(data_realtime_db)
-
-    # Get the current time
-    current_time = time.time()
-
-    # Check if an hour has passed since the last Firestore upload
-    if (current_time - last_firestore_upload_time) >= 5:  # 60 seconds = 1 minute
-        last_firestore_upload_time = current_time
-
-        # Dictionary with the data to send to Firestore
-        data_firestore = {
+        # Dictionary with the data to send to Firebase Realtime Database
+        data_realtime_db = {
+            "Status": checkStatus,
             "ppm": ppm,
-            "timestamp": form_time,
-            "workgroupId": unique_Id
+            "status_notif": status_notif
             # Add more data as needed
         }
 
-        doc_ref = db.collection('tds_values').add(data_firestore)
+        # Send the data to Firebase Realtime Database
+        realtime_db.update(data_realtime_db)
 
-    # Wait for the next iteration
-    time.sleep(2)
+        # Get the current time
+        current_time = time.time()
+
+        # Check if an hour has passed since the last Firestore upload
+        if (current_time - last_firestore_upload_time) >= 5:  # 60 seconds = 1 minute
+            last_firestore_upload_time = current_time
+
+            # Dictionary with the data to send to Firestore
+            data_firestore = {
+                "ppm": ppm,
+                "timestamp": form_time,
+                "workgroupId": unique_Id
+                # Add more data as needed
+            }
+
+            doc_ref = db.collection('tds_values').add(data_firestore)
+
+        # Wait for the next iteration
+        time.sleep(5)
+
+except KeyboardInterrupt:
+    checkStatus = False
+    data_realtime_db = {
+        "Status": checkStatus,    
+    }
+    realtime_db.update(data_realtime_db)
+    print("\nMeasurement stopped.")

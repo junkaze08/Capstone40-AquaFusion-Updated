@@ -31,16 +31,15 @@ db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
 last_firestore_upload_time = time.time()
 
-utc_offset = 8
-curr_time = time.gmtime(time.time() + utc_offset * 3600)
-form_time = time.strftime("%H:%M:%S", curr_time)
-
 try:
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(TRIG, GPIO.OUT)
     GPIO.setup(ECHO, GPIO.IN)
 
     while True:
+        utc_offset = 8
+        curr_time = time.gmtime(time.time() + utc_offset * 3600)
+        form_time = time.strftime("%H:%M:%S", curr_time)
         try:
             GPIO.output(TRIG, False)
             time.sleep(2)
@@ -62,6 +61,9 @@ try:
             threshold_low = 5  # minimum distance for low water level
             threshold_high = 20  # maximum distance for high water level
 
+            if distance >= 0:
+                checkStatus = True
+
             if distance <= 0:
                 water_status = "Error: Distance is not valid."
             elif distance < threshold_low:
@@ -72,10 +74,13 @@ try:
                 water_status = f"Warning: High water level! {distance} Check for potential issues."
 
             print("Distance:", distance, "cm")
+            print(form_time)
             print(water_status)
+            print(checkStatus)
 
             # Dictionary with the data to send to Firebase Realtime Database
             data_realtime_db = {
+                "Status": checkStatus,
                 "distance": distance,
                 "status_notif": water_status            
             }
@@ -86,7 +91,9 @@ try:
             # Get the current time
             current_time = time.time()
             
-            if (current_time - last_firestore_upload_time) >= 5: 
+            firestore_upload_interval = 5
+            
+            if (current_time - last_firestore_upload_time >= firestore_upload_interval): 
                 last_firestore_upload_time = current_time
 
                 data_firestore = {
@@ -98,8 +105,13 @@ try:
                 doc_ref = db.collection('ultrasonic_water').add(data_firestore)
         except KeyboardInterrupt:
             print("Measurement stopped by the user.")
+            checkStatus = False
+            data_realtime_db = {
+                "Status": checkStatus,    
+            }
+            realtime_db.update(data_realtime_db)
             break
                 
 finally:
     GPIO.cleanup()
-    time.sleep(2)
+    time.sleep(1)

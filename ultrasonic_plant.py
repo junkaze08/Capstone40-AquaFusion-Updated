@@ -31,16 +31,15 @@ db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
 last_firestore_upload_time = time.time()
 
-utc_offset = 8
-curr_time = time.gmtime(time.time() + utc_offset * 3600)
-form_time = time.strftime("%H:%M:%S", curr_time)
-
 try:
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(TRIG, GPIO.OUT)
     GPIO.setup(ECHO, GPIO.IN)
 
     while True:
+        utc_offset = 8
+        curr_time = time.gmtime(time.time() + utc_offset * 3600)
+        form_time = time.strftime("%H:%M:%S", curr_time)
         try:
             GPIO.output(TRIG, False)
             time.sleep(2)
@@ -62,6 +61,9 @@ try:
             plant_distance = 20  # initial distance
             max_growth = 50
 
+            if distance >= 0:
+                checkStatus = True
+
             # Conditional statements based on distance
             if distance <= 0:
                 plant_status = "Error: Distance is not valid."
@@ -78,6 +80,7 @@ try:
 
             # Dictionary with the data to send to Firebase Realtime Database
             data_realtime_db = {
+                "Status": checkStatus,
                 "distance": distance,          
                 "status_notif": plant_status
             }
@@ -99,9 +102,14 @@ try:
                 
                 doc_ref = db.collection('ultrasonic_plant').add(data_firestore)
         except KeyboardInterrupt:
+            checkStatus = False
+            data_realtime_db = {
+                "Status": checkStatus,    
+            }
+            realtime_db.update(data_realtime_db)
             print("Measurement stopped by the user.")
             break
                 
 finally:
     GPIO.cleanup()
-    time.sleep(2)
+    time.sleep(1)
