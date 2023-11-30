@@ -4,7 +4,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG, WORKGROUP_ID
+from config import FIREBASE_CONFIG, WORKGROUP_ID, FIREBASE_DHT
 
 DHT_SENSOR = Adafruit_DHT.DHT22
 DHT_PIN = 26
@@ -19,13 +19,26 @@ firebase_admin.initialize_app(cred_firestore, {
     'projectId': FIREBASE_CONFIG['projectId'],
 }, name='firestore')
 
-realtime_db_humidity = db.reference('/dht22_temperature_humidity', app=firebase_admin.get_app(name='realtime'))
+realtime_db_humidity = db.reference(FIREBASE_DHT['sensorCollectionHumidity'], app=firebase_admin.get_app(name='realtime'))
+realtime_db_temperature = db.reference(FIREBASE_DHT['sensorCollectionTemperature'], app=firebase_admin.get_app(name='realtime'))
 
-realtime_db_temperature = db.reference('/dht22_temperature_temperature', app=firebase_admin.get_app(name='realtime'))
+realtime_db_threshold_upper_humidity = db.reference(FIREBASE_DHT['sensorUpperHumidity'], app=firebase_admin.get_app(name='realtime'))
+dht_limits_upper_humidity = realtime_db_threshold_upper_humidity.get()
+realtime_db_threshold_lower_humidity = db.reference(FIREBASE_DHT['sensorLowerHumidity'], app=firebase_admin.get_app(name='realtime'))
+dht_limits_lower_humidity = realtime_db_threshold_lower_humidity.get()
+
+realtime_db_threshold_upper_temperature = db.reference(FIREBASE_DHT['sensorUpperTemperature'], app=firebase_admin.get_app(name='realtime'))
+dht_limits_upper_temperature = realtime_db_threshold_upper_temperature.get()
+realtime_db_threshold_lower_temperature = db.reference(FIREBASE_DHT['sensorLowerTemperature'], app=firebase_admin.get_app(name='realtime'))
+dht_limits_lower_temperature = realtime_db_threshold_lower_temperature.get()
+
+realtime_db_threshold_normal_humidity = db.reference(FIREBASE_DHT['sensorNormalHumidity'], app=firebase_admin.get_app(name='realtime'))
+dht_normal_humidity = realtime_db_threshold_normal_humidity.get()
+
+realtime_db_threshold_normal_temperature = db.reference(FIREBASE_DHT['sensorNormalTemperature'], app=firebase_admin.get_app(name='realtime'))
+dht_normal_temperature = realtime_db_threshold_normal_temperature.get()
 
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
-
-unique_Id = WORKGROUP_ID['uniqueId']
 
 # Reference to the Firestore collection for humidity
 humidity_collection = db.collection('DHT22_Humidity')
@@ -33,8 +46,47 @@ humidity_collection = db.collection('DHT22_Humidity')
 # Reference to the Firestore collection for temperature
 temperature_collection = db.collection('DHT22_Temperature')
 
+unique_Id = WORKGROUP_ID['uniqueId']
+
 # Time tracking variables
 last_firestore_upload_time = 0
+
+def on_threshold_change_upper_humidity(event):
+    global dht_limits_upper_humidity
+    if event.data is not None:
+        dht_limits_upper_humidity = str(event.data)
+        print("Threshold upper levels humidity updated:", dht_limits_upper_humidity)
+    else:
+        print("Threshold levels data not available in the database.")
+        
+def on_threshold_change_lower_humidity(event):
+    global dht_limits_lower_humidity
+    if event.data is not None:
+        dht_limits_lower_humidity = str(event.data)
+        print("Threshold lower levels humidity updated:", dht_limits_lower_humidity)
+    else:
+        print("Threshold levels data not available in the database.")
+        
+def on_threshold_change_upper_temperature(event):
+    global dht_limits_upper_temperature
+    if event.data is not None:
+        dht_limits_upper_temperature = str(event.data)
+        print("Threshold upper levels temperature updated:", dht_limits_upper_temperature)
+    else:
+        print("Threshold levels data not available in the database.")
+
+def on_threshold_change_lower_temperature(event):
+    global dht_limits_lower_temperature
+    if event.data is not None:
+        dht_limits_lower_temperature = str(event.data)
+        print("Threshold lower levels temperature updated:", dht_limits_lower_temperature)
+    else:
+        print("Threshold levels data not available in the database.")
+
+threshold_listener_lower_temperature = realtime_db_threshold_lower_temperature.listen(on_threshold_change_upper_temperature)
+threshold_listener_upper_temperature = realtime_db_threshold_upper_temperature.listen(on_threshold_change_lower_temperature)
+threshold_listener_lower_humidity = realtime_db_threshold_lower_humidity.listen(on_threshold_change_upper_humidity)
+threshold_listener_upper_humidity = realtime_db_threshold_upper_humidity.listen(on_threshold_change_lower_humidity)
 
 try:
     while True:
@@ -52,19 +104,32 @@ try:
                 if temperature >= 0:
                     checkStatus = True
                 
-                if temperature < 18:
-                    temperature_status = "Warning: Cold Temperature"
-                elif 18 <= temperature <= 24:
-                    temperature_status = "Optimal Temperature"
-                else:
-                    temperature_status = "Warning: Hot Temperature"
+                lower_key_humidity = FIREBASE_DHT['sensorConditionalLowerHumidity']
+                upper_key_humidity = FIREBASE_DHT['sensorConditionalUpperHumidity']
+                lower_key_temperature = FIREBASE_DHT['sensorConditionalLowerTemperature']
+                upper_key_temperature = FIREBASE_DHT['sensorConditionalUpperTemperature']
+                
+                if dht_normal_temperature and lower_key_temperature in dht_normal_temperature and upper_key_temperature in dht_normal_temperature:
+                    lower_limit_temperature = dht_normal_temperature[lower_key_temperature]
+                    upper_limit_temperature = dht_normal_temperature[upper_key_temperature]
                     
-                if humidity < 60:
-                    humidity_status = "Warning: Too Low Humidity"
-                elif 60 <= humidity <= 70:
-                    humidity_status = "Optimal Humidity"
-                else:
-                    humidity_status = "Warning: Too High Humidity"
+                    if temperature < lower_limit_temperature:
+                        temperature_status = "Warning: Cold Temperature"
+                    elif lower_limit_temperature <= temperature <= upper_limit_temperature:
+                        temperature_status = "Optimal Temperature"
+                    else:
+                        temperature_status = "Warning: Hot Temperature"
+                
+                if dht_normal_humidity and lower_key_humidity in dht_normal_humidity and lower_key_humidity in dht_normal_humidity:
+                    lower_limit_humidity = dht_normal_humidity[lower_key_humidity]
+                    upper_limit_humidity = dht_normal_humidity[upper_key_humidity]
+                        
+                    if humidity < lower_limit_humidity:
+                        humidity_status = "Warning: Too Low Humidity"
+                    elif lower_limit_humidity <= humidity <= upper_limit_humidity:
+                        humidity_status = "Optimal Humidity"
+                    else:
+                        humidity_status = "Warning: Too High Humidity"
 
                 print(temperature_status)
                 print(humidity_status)
@@ -119,6 +184,11 @@ try:
             print(f"An error occurred: {str(e)}")
 
 except KeyboardInterrupt:
+    threshold_listener_lower_temperature.close()
+    threshold_listener_upper_temperature.close()
+    threshold_listener_lower_humidity.close()
+    threshold_listener_upper_humidity.close()
+        
     checkStatus = False
     data_realtime_db_humidity = {
         "Status": checkStatus,    
