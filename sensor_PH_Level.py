@@ -6,7 +6,7 @@ import statistics
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG, WORKGROUP_ID
+from config import FIREBASE_CONFIG, WORKGROUP_ID, FIREBASE_PH
 
 # Initialize Firebase Admin for Realtime Database
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
@@ -21,7 +21,19 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/PH_values', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference(FIREBASE_PH['sensorCollection'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_lower = db.reference(FIREBASE_PH['sensorLower'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_upper = db.reference(FIREBASE_PH['sensorUpper'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_normal = db.reference(FIREBASE_PH['sensorNormal'], app=firebase_admin.get_app(name='realtime'))
+
+pH_normal = realtime_db_threshold_normal.get()
+
+pH_limits_lower = realtime_db_threshold_lower.get()
+
+pH_limits_upper = realtime_db_threshold_upper.get()
 
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
@@ -48,6 +60,25 @@ ROLLING_MEDIAN_WINDOW = 5
 # Lists to store pH values for statistical analysis
 pH_values = []
 rolling_pH_values = deque(maxlen=ROLLING_MEDIAN_WINDOW)
+
+def on_threshold_change_lower(event):
+    global pH_limits_lower
+    if event.data is not None:
+        pH_limits_lower = str(event.data)
+        print("Threshold lower levels updated:", pH_limits_lower)
+    else:
+        print("Threshold levels data not available in the database.")
+    
+def on_threshold_change_upper(event):
+    global pH_limits_upper
+    if event.data is not None:
+        pH_limits_upper = str(event.data)
+        print("Threshold upper levels updated:", pH_limits_upper)
+    else:
+        print("Threshold levels data not available in the database.")
+
+threshold_listener_lower = realtime_db_threshold_lower.listen(on_threshold_change_lower)
+threshold_listener_upper = realtime_db_threshold_upper.listen(on_threshold_change_upper)
 
 try:
 # Read the pH level and send data to both Realtime Database and Firestore
@@ -90,13 +121,28 @@ try:
         if finalpH >= 0:
             checkStatus = True
             
+        lower_key = FIREBASE_PH['sensorConditionalLower']
+        upper_key = FIREBASE_PH['sensorConditionalUpper']
+        
+        if pH_normal and lower_key in pH_normal and upper_key in pH_normal:
+            lower_limit = pH_normal[lower_key]
+            upper_limit = pH_normal[upper_key]
+            
+            if finalpH < lower_limit:
+                ph_status = "Warning: Too Low pH Level!" 
+            elif lower_limit <= finalpH <= upper_limit:
+                ph_status = "Optimal pH Level"
+            else:
+                ph_status = "Warning: Too High pH Level!"
+        
         # Get the current time
         current_time = time.time()
 
         # Send data to Realtime Database every 1 second
         data_realtime_db = {
             "Status": checkStatus,
-            "ph_level": finalpH
+            "ph_level": finalpH,
+            "status_notif": ph_status
         }
         realtime_db.update(data_realtime_db)
 
@@ -113,6 +159,8 @@ try:
         time.sleep(4)
 
 except KeyboardInterrupt:
+    threshold_listener_lower.close()
+    threshold_listener_upper.close()
     checkStatus = False
     data_realtime_db = {
         "Status": checkStatus,    
