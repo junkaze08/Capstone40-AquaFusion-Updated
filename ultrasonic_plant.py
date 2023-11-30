@@ -4,7 +4,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG, WORKGROUP_ID
+from config import FIREBASE_CONFIG, WORKGROUP_ID, FIREBASE_PLANT
 
 TRIG = 27
 ECHO = 22
@@ -22,7 +22,19 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/ultrasonic_plant', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference(FIREBASE_PLANT['sensorCollection'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_lower = db.reference(FIREBASE_PLANT['sensorLower'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_upper = db.reference(FIREBASE_PLANT['sensorUpper'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_normal = db.reference(FIREBASE_PLANT['sensorNormal'], app=firebase_admin.get_app(name='realtime'))
+
+plant_normal = realtime_db_threshold_normal.get()
+
+plant_limits_lower = realtime_db_threshold_lower.get()
+
+plant_limits_upper = realtime_db_threshold_upper.get()
 
 unique_Id = WORKGROUP_ID['uniqueId']
 
@@ -30,6 +42,25 @@ unique_Id = WORKGROUP_ID['uniqueId']
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
 
 last_firestore_upload_time = time.time()
+
+def on_threshold_change_lower(event):
+    global plant_limits_lower
+    if event.data is not None:
+        plant_limits_lower = str(event.data)
+        print("Threshold lower levels updated:", plant_limits_lower)
+    else:
+        print("Threshold levels data not available in the database.")
+    
+def on_threshold_change_upper(event):
+    global plant_limits_upper
+    if event.data is not None:
+        plant_limits_upper = str(event.data)
+        print("Threshold upper levels updated:", plant_limits_upper)
+    else:
+        print("Threshold levels data not available in the database.")
+
+threshold_listener_lower = realtime_db_threshold_lower.listen(on_threshold_change_lower)
+threshold_listener_upper = realtime_db_threshold_upper.listen(on_threshold_change_upper)
 
 try:
     GPIO.setmode(GPIO.BCM)
@@ -58,22 +89,26 @@ try:
             distance = pulse_duration * 17150
             distance = round(distance, 2)
 
-            plant_distance = 20  # initial distance
-            max_growth = 50
-
             if distance >= 0:
                 checkStatus = True
 
+            lower_key = FIREBASE_PLANT['sensorConditionalLower']
+            upper_key = FIREBASE_PLANT['sensorConditionalUpper']
+
             # Conditional statements based on distance
-            if distance <= 0:
-                plant_status = "Error: Distance is not valid."
-            elif distance < max_growth:
-                plant_status = "The plant is growing."
-            elif distance == max_growth:
-                plant_status = "The plant has reached maximum growth."
-            else:
-                plant_status = f"Warning: Unexpected distance value of {distance}. Check sensor or system."
+            if plant_normal and lower_key in plant_normal and upper_key in plant_normal:
+                lower_limit = plant_normal[lower_key]
+                upper_limit = plant_normal[upper_key]
             
+                if distance <= 0:
+                    plant_status = "Error: Distance is not valid."
+                elif distance < upper_limit:
+                    plant_status = "The plant is growing."
+                elif lower_limit <= distance <= upper_limit:
+                    plant_status = "The plant has reached maximum growth."
+                else:
+                    plant_status = f"Warning: Unexpected distance value of {distance}. Check sensor or system."
+                            
             print("Distance:", distance, "cm")
             print(form_time)
             print(plant_status)
@@ -91,7 +126,7 @@ try:
             # Get the current time
             current_time = time.time()
             
-            if (current_time - last_firestore_upload_time) >= 5:  #60 seconds = 1 minute
+            if (current_time - last_firestore_upload_time) >= 60:  #60 seconds = 1 minute
                 last_firestore_upload_time = current_time
 
                 data_firestore = {
@@ -102,6 +137,8 @@ try:
                 
                 doc_ref = db.collection('ultrasonic_plant').add(data_firestore)
         except KeyboardInterrupt:
+            threshold_listener_lower.close()
+            threshold_listener_upper.close()
             checkStatus = False
             data_realtime_db = {
                 "Status": checkStatus,    
