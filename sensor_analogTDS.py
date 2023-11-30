@@ -1,3 +1,4 @@
+# AquaFusion - BSIT 4A - CPSTONE
 import time
 import board
 import busio
@@ -6,7 +7,7 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db, firestore
-from config import FIREBASE_CONFIG, WORKGROUP_ID
+from config import FIREBASE_CONFIG, WORKGROUP_ID, FIREBASE_TDS
 
 # Initialize Firebase Admin for Realtime Database
 cred = credentials.Certificate(FIREBASE_CONFIG['serviceAccountKeyPath'])
@@ -21,7 +22,19 @@ firebase_admin.initialize_app(cred_firestore, {
 }, name='firestore')
 
 # Initialize Realtime Database
-realtime_db = db.reference('/tds_values', app=firebase_admin.get_app(name='realtime'))
+realtime_db = db.reference(FIREBASE_TDS['sensorCollection'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_lower = db.reference(FIREBASE_TDS['sensorLower'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_upper = db.reference(FIREBASE_TDS['sensorUpper'], app=firebase_admin.get_app(name='realtime'))
+
+realtime_db_threshold_normal = db.reference(FIREBASE_TDS['sensorNormal'], app=firebase_admin.get_app(name='realtime'))
+
+tds_normal = realtime_db_threshold_normal.get()
+
+tds_limits_lower = realtime_db_threshold_lower.get()
+
+tds_limits_upper = realtime_db_threshold_upper.get()
 
 # Initialize Firestore
 db = firestore.client(app=firebase_admin.get_app(name='firestore'))
@@ -65,12 +78,31 @@ def calculate_tds(voltage):
     temperature = 25.0
     compensation_coefficient = 1.0 + 0.02 * (temperature - 25.0)
     compensation_voltage = voltage / compensation_coefficient
-    tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5 - 6.0
+    tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5 - 12.0
 
     # Ensure the result is not less than 0
     tds_value = max(tds_value, 0)
 
     return tds_value
+
+def on_threshold_change_lower(event):
+    global tds_limits_lower
+    if event.data is not None:
+        tds_limits_lower = str(event.data)
+        print("Threshold lower levels updated:", tds_limits_lower)
+    else:
+        print("Threshold levels data not available in the database.")
+    
+def on_threshold_change_upper(event):
+    global tds_limits_upper
+    if event.data is not None:
+        tds_limits_upper = str(event.data)
+        print("Threshold upper levels updated:", tds_limits_upper)
+    else:
+        print("Threshold levels data not available in the database.")
+
+threshold_listener_lower = realtime_db_threshold_lower.listen(on_threshold_change_lower)
+threshold_listener_upper = realtime_db_threshold_upper.listen(on_threshold_change_upper)
 
 try:
     while True:
@@ -102,17 +134,24 @@ try:
         if ppm >= 0:
             checkStatus = True
         
-        if(ppm < 560):
-            status_notif = "Warning: TDS level is low!" 
-        elif(ppm <= 860):
-            status_notif = "TDS level is optimal!"
-        else:
-            status_notif = "Warning: TDS level is too high!"
+        lower_key = FIREBASE_TDS['sensorConditionalLower']
+        upper_key = FIREBASE_TDS['sensorConditionalUpper']
+        
+        if tds_normal and lower_key in tds_normal and upper_key in tds_normal:
+            lower_limit = tds_normal[lower_key]
+            upper_limit = tds_normal[upper_key]
+            
+            if ppm < lower_limit:
+                status_notif = "Warning: TDS level is low!" 
+            elif lower_limit <= ppm <= upper_limit:
+                status_notif = "TDS level is optimal!"
+            else:
+                status_notif = "Warning: TDS level is too high!"
         
         # Print TDS value (adjusted by subtracting 2, limited to not be less than 0)
         print("TDS Value: {:.2f} ppm".format(ppm))
         print(status_notif)
-        print(form_time)    
+        print(form_time)
 
         # Dictionary with the data to send to Firebase Realtime Database
         data_realtime_db = {
@@ -129,7 +168,7 @@ try:
         current_time = time.time()
 
         # Check if an hour has passed since the last Firestore upload
-        if (current_time - last_firestore_upload_time) >= 5:  # 60 seconds = 1 minute
+        if (current_time - last_firestore_upload_time) >= 60:  # 60 seconds = 1 minute
             last_firestore_upload_time = current_time
 
             # Dictionary with the data to send to Firestore
@@ -143,9 +182,11 @@ try:
             doc_ref = db.collection('tds_values').add(data_firestore)
 
         # Wait for the next iteration
-        time.sleep(5)
+        time.sleep(2)
 
 except KeyboardInterrupt:
+    threshold_listener_lower.close()
+    threshold_listener_upper.close()
     checkStatus = False
     data_realtime_db = {
         "Status": checkStatus,    
