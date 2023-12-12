@@ -109,6 +109,8 @@ try:
         utc_offset = 8
         curr_time = time.gmtime(time.time() + utc_offset * 3600)
         form_time = time.strftime("%H:%M:%S", curr_time)
+        time_period = time.strftime("%Y:%m:%d", curr_time)
+
         # Read analog value from ADS1115
         analogBuffer[analogBufferIndex] = chan.value
         analogBufferIndex += 1
@@ -175,6 +177,7 @@ try:
             data_firestore = {
                 "ppm": ppm,
                 "timestamp": form_time,
+                "timeperiod": time_period,
                 "workgroupId": unique_Id
                 # Add more data as needed
             }

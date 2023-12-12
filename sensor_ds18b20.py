@@ -89,6 +89,7 @@ try:
         utc_offset = 8
         curr_time = time.gmtime(time.time() + utc_offset * 3600)
         form_time = time.strftime("%H:%M:%S", curr_time)
+        time_period = time.strftime("%Y:%m:%d", curr_time)
         
         temperature = round(read_temp(), 1)
 
@@ -133,6 +134,7 @@ try:
                 data_firestore = {
                     "temperature": temperature,
                     "timestamp": form_time,
+                    "timeperiod": time_period,
                     "workgroupId": unique_Id
                 }
                 

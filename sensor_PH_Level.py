@@ -137,6 +137,7 @@ try:
         
         # Get the current time
         current_time = time.time()
+        print(ph_status)
 
         # Send data to Realtime Database every 1 second
         data_realtime_db = {
