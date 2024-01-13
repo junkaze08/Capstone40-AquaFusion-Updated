@@ -170,7 +170,7 @@ try:
         current_time = time.time()
 
         # Check if an hour has passed since the last Firestore upload
-        if (current_time - last_firestore_upload_time) >= 60:  # 60 seconds = 1 minute
+        if (current_time - last_firestore_upload_time) >= 5:  # 60 seconds = 1 minute
             last_firestore_upload_time = current_time
 
             # Dictionary with the data to send to Firestore

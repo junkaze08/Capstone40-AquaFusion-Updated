@@ -84,12 +84,18 @@ def on_threshold_change_upper(event):
 threshold_listener_lower = realtime_db_threshold_lower.listen(on_threshold_change_lower)
 threshold_listener_upper = realtime_db_threshold_upper.listen(on_threshold_change_upper)
 
+prev_temp_status = None
+prev_sensor_status = None
+notif_title = "Water Temperature Alert"
+notif_type = "alert"
+
 try:
     while True:
         utc_offset = 8
         curr_time = time.gmtime(time.time() + utc_offset * 3600)
         form_time = time.strftime("%H:%M:%S", curr_time)
         time_period = time.strftime("%Y:%m:%d", curr_time)
+        date_time = time.strftime("%m/%d/%Y", curr_time)
         
         temperature = round(read_temp(), 1)
 
@@ -102,6 +108,21 @@ try:
             
             if temperature >= 0:
                 checkStatus = True
+                sensor_status = "On"
+        
+                if sensor_status != prev_sensor_status:
+                        prev_sensor_status = sensor_status
+
+                        data_firestore_status = {
+                            "notificationDate": date_time,
+                            "notificationDescription": prev_sensor_status,
+                            "notificationTitle": notif_title,
+                            "notificationTimestamp": form_time,
+                            "notificationType": notif_type,
+                            "workgroupId": unique_Id
+                        }
+                        
+                        doc_ref_alert_status = db.collection('notifications').add(data_firestore_status)
 
             lower_key = FIREBASE_DS18B20['sensorConditionalLower']
             upper_key = FIREBASE_DS18B20['sensorConditionalUpper']
@@ -116,6 +137,21 @@ try:
                     temperature_status = "Optimal Temperature"
                 else:
                     temperature_status = "Warning: Hot Temperature"
+                
+                if temperature_status != prev_temp_status:
+                # Update the previous pH status
+                    prev_temp_status = temperature_status
+
+                    data_firestore_alert = {
+                        "notificationDate": date_time,
+                        "notificationDescription": prev_temp_status,
+                        "notificationTitle": notif_title,
+                        "notificationTimestamp": form_time,
+                        "notificationType": notif_type,
+                        "workgroupId": unique_Id
+                    }
+                
+                    doc_ref_alert = db.collection('notifications').add(data_firestore_alert)
                     
             print(temperature_status)
             
@@ -150,8 +186,20 @@ except KeyboardInterrupt:
     threshold_listener_lower.close()
     threshold_listener_upper.close()
     checkStatus = False
+    sensor_off = "Water Temperature Sensor is Off"
+
     data_realtime_db = {
         "Status": checkStatus,    
     }
     realtime_db.update(data_realtime_db)
+    data_firestore_off = {
+        "notificationDate": date_time,
+        "notificationDescription": sensor_off,
+        "notificationTitle": notif_title,
+        "notificationTimestamp": form_time,
+        "notificationType": notif_type,
+        "workgroupId": unique_Id
+    }
+        
+    doc_ref_alert_off = db.collection('notifications').add(data_firestore_off)
     print("\nMeasurement stopped.")

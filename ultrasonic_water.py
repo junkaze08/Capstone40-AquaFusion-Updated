@@ -62,6 +62,11 @@ def on_threshold_change_upper(event):
 threshold_listener_lower = realtime_db_threshold_lower.listen(on_threshold_change_lower)
 threshold_listener_upper = realtime_db_threshold_upper.listen(on_threshold_change_upper)
 
+prev_water_status = None
+prev_sensor_status = None
+notif_title = "Water Volume Alert"
+notif_type = "alert"
+
 try:
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(TRIG, GPIO.OUT)
@@ -72,6 +77,7 @@ try:
         curr_time = time.gmtime(time.time() + utc_offset * 3600)
         form_time = time.strftime("%H:%M:%S", curr_time)
         time_period = time.strftime("%Y:%m:%d", curr_time)
+        date_time = time.strftime("%m/%d/%Y", curr_time)
         try:
             GPIO.output(TRIG, False)
             time.sleep(2)
@@ -92,6 +98,21 @@ try:
 
             if distance >= 0:
                 checkStatus = True
+                sensor_status = "On"
+        
+                if sensor_status != prev_sensor_status:
+                        prev_sensor_status = sensor_status
+
+                        data_firestore_status = {
+                            "notificationDate": date_time,
+                            "notificationDescription": prev_sensor_status,
+                            "notificationTitle": notif_title,
+                            "notificationTimestamp": form_time,
+                            "notificationType": notif_type,
+                            "workgroupId": unique_Id
+                        }
+                        
+                        doc_ref_alert_status = db.collection('notifications').add(data_firestore_status)
 
             lower_key = FIREBASE_WATER['sensorConditionalLower']
             upper_key = FIREBASE_WATER['sensorConditionalUpper']
@@ -100,14 +121,28 @@ try:
                 lower_limit = water_normal[lower_key]
                 upper_limit = water_normal[upper_key]
 
-                if distance <= 0:
-                    water_status = "Error: Distance is not valid."
-                elif distance < lower_limit:
-                    water_status = "Warning: Low water level! Please refill."
-                elif lower_limit <= distance <= upper_limit:
-                    water_status = "Water level is within the optimal range."
-                else:
-                    water_status = f"Warning: High water level! {distance} Check for potential issues."
+            if distance <= 0:
+                water_status = "Error: Distance is not valid."
+            elif distance < lower_limit:
+                water_status = "Warning: High water volume!"
+            elif lower_limit <= distance <= upper_limit:
+                water_status = "Optimal"
+            else:
+                water_status = "Warning: Low water volume! Please refill."
+            
+            if water_status != prev_water_status:
+                prev_water_status = water_status
+
+                data_firestore_alert = {
+                    "notificationDate": date_time,
+                    "notificationDescription": prev_water_status,
+                    "notificationTitle": notif_title,
+                    "notificationTimestamp": form_time,
+                    "notificationType": notif_type,
+                    "workgroupId": unique_Id
+                }
+                
+                doc_ref_alert = db.collection('notifications').add(data_firestore_alert)
                 
             print("Distance:", distance, "cm")
             print(form_time)
@@ -126,7 +161,7 @@ try:
             # Get the current time
             current_time = time.time()
             
-            firestore_upload_interval = 60 #60 seconds = 1 minute
+            firestore_upload_interval = 5 #60 seconds = 1 minute
             
             if (current_time - last_firestore_upload_time >= firestore_upload_interval): 
                 last_firestore_upload_time = current_time
@@ -144,10 +179,23 @@ try:
             threshold_listener_upper.close()
             print("Measurement stopped by the user.")
             checkStatus = False
+            sensor_off = "Water Sensor is Off"
+
             data_realtime_db = {
                 "Status": checkStatus,    
             }
             realtime_db.update(data_realtime_db)
+
+            data_firestore_off = {
+                "notificationDate": date_time,
+                "notificationDescription": sensor_off,
+                "notificationTitle": notif_title,
+                "notificationTimestamp": form_time,
+                "notificationType": notif_type,
+                "workgroupId": unique_Id
+            }
+            
+            doc_ref_alert_off = db.collection('notifications').add(data_firestore_off)
             break
                 
 finally:
