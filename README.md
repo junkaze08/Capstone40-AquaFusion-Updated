@@ -42,6 +42,8 @@ Mr. Jecris G. Sabanal
 ## Adviser - Hardware Integration
 Mr. David Matthew Derit
 
+## License
+[	AGPL-3.0](LICENSE)
 ---
 
 For any inquiries or support, please contact Junester Ursora II at [b2xjunester@gmail.com](mailto:b2xjunester@gmail.com).
