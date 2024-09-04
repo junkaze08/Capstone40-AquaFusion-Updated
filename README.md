@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/715290887.svg)](https://zenodo.org/doi/10.5281/zenodo.13680180)
+
 # AquaFusion README
 
 **Capstone Title**: *AquaFusion: An IoT-Based Aquaponics Monitoring System*
