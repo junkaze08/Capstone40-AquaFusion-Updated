@@ -1,4 +1,5 @@
-[![DOI](https://zenodo.org/badge/715290887.svg)](https://zenodo.org/doi/10.5281/zenodo.13680180)
+[![DOI](https://zenodo.org/badge/715290887.svg)](https://zenodo.org/doi/10.5281/zenodo.13680180) 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14847793.svg)](https://doi.org/10.5281/zenodo.14847793)
 
 # AquaFusion README
 
